@@ -267,8 +267,11 @@ def _get_landuse(region, date_begin, date_end):
     # classify current image
     classified = image.classify(classifier)
 
+    legger = _get_legger_image(date_begin)
+    legger_mask = legger.mask()
+
     classified = classified \
-        .updateMask(landuse_legger.mask()) \
+        .updateMask(legger_mask) \
         .clip(region)
 
     return classified \
