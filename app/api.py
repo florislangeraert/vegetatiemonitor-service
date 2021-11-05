@@ -524,8 +524,8 @@ zonal_info = {
 yearly_collections = {
     'satellite': 'users/rogersckw9/vegetatiemonitor/satellite-yearly',
     'ndvi': 'users/rogersckw9/vegetatiemonitor/satellite-yearly',
-    'landuse': 'users/rogersckw9/vegetatiemonitor/yearly-classified-images',
-    'landuse-vs-legger': 'users/rogersckw9/vegetatiemonitor/classificatie-vs-legger'
+    'landuse': 'projects/deltares-rws/vegetatiemonitor/classificatie',
+    'landuse-vs-legger': 'projects/deltares-rws/vegetatiemonitor/classificatie-vs-legger'
 }
 
 
@@ -1217,7 +1217,7 @@ def predict_roughness(region, start_date, num_years):
     # start_date = ee.Date(startYearString + '-11-01')
     feature = ee.FeatureCollection(region["features"]).first()
     ecotop_features = ee.FeatureCollection("users/gertjang/succession/ecotopen_cyclus_drie_rijntakken_utm31n")
-    classified_images = ee.ImageCollection('users/rogersckw9/vegetatiemonitor/yearly-classified-images')
+    classified_images = ee.ImageCollection(yearly_collections['landuse'])
     start_year = ee.Date(start_date).get('year')
     lookback = start_date.advance(-1, 'year')
 
@@ -1303,7 +1303,7 @@ def get_roughness_info(prediction_images):
     prediction_images = prediction_images.filterDate(predict_start, predict_start.advance(10, 'years'))
 
     # ecotop_features = ee.FeatureCollection("users/gertjang/succession/ecotopen_cyclus_drie_rijntakken_utm31n")
-    image_collection = ee.ImageCollection('users/rogersckw9/vegetatiemonitor/yearly-classified-images')
+    image_collection = ee.ImageCollection(yearly_collections['landuse'])
     empty = ee.Image().set("system:time_start", ee.Date("2012-06-01").millis()).rename("ruwheid")
     image_collection = image_collection.merge(ee.ImageCollection([empty])).sort("system:time_start")
     # ecotopen_images = ecotopen_images.map(add_date)
