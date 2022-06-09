@@ -2,10 +2,11 @@ import os
 import json
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, redirect, request
+from app.postgres import SessionLocal
+from app import crud
 import flask_cors
 from flasgger import Swagger
 import ee
-from google.cloud import firestore
 
 import error_handler
 
@@ -18,6 +19,13 @@ import error_handler
 app = Flask(__name__)
 
 app.register_blueprint(error_handler.error_handler)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # register specs
 Swagger(app, template_file='api.yaml')
@@ -700,7 +708,7 @@ def get_image_url(image):
     return url
 
 
-@app.route('/map/<string:id>/export/', methods=['POST'])
+@app.route('/app/map/<string:id>/export/', methods=['POST'])
 @flask_cors.cross_origin()
 def export_map(id):
     """
@@ -753,7 +761,7 @@ def export_map(id):
     return jsonify(results)
 
 
-@app.route('/map/<string:id>/', methods=['POST'])
+@app.route('/app/map/<string:id>/', methods=['POST'])
 @flask_cors.cross_origin()
 def get_map(id):
     """
@@ -783,7 +791,7 @@ def get_map(id):
     return jsonify(results)
 
 
-@app.route('/map/<string:id>/zonal-info/', methods=['POST'])
+@app.route('/app/map/<string:id>/zonal-info/', methods=['POST'])
 @flask_cors.cross_origin()
 def get_map_zonal_info(id):
     """
@@ -825,7 +833,7 @@ def get_map_zonal_info(id):
     return jsonify(info)
 
 
-@app.route('/map/<string:id>/zonal-timeseries/', methods=['POST'])
+@app.route('/app/map/<string:id>/zonal-timeseries/', methods=['POST'])
 @flask_cors.cross_origin()
 def get_map_zonal_timeseries(id):
     """
@@ -920,7 +928,7 @@ def _get_map_times_yearly(id, region):
     return image_info_list
 
 
-@app.route('/map/<string:id>/times/<string:mode>', methods=['POST'])
+@app.route('/app/map/<string:id>/times/<string:mode>', methods=['POST'])
 @flask_cors.cross_origin()
 def get_map_times(id, mode):
     """
@@ -1361,7 +1369,7 @@ def get_voorspel_timeseries(region, collection, scale):
     return timeseries
 
 
-@app.route('/voorspel/', methods=['POST'])
+@app.route('/app/voorspel/', methods=['POST'])
 @flask_cors.cross_origin()
 def get_voorspel():
     json = request.get_json()
@@ -1392,7 +1400,7 @@ def get_voorspel():
     return jsonify(info)
 
 
-@app.route('/image/', methods=['POST'])
+@app.route('/app/image/', methods=['POST'])
 @flask_cors.cross_origin()
 def get_image_by_id():
     id = request.args.get('id')
@@ -1414,13 +1422,10 @@ def _compound_tile_index(tx, ty):
     return tx * 100000 + ty
 
 
-@app.route('/get_times_by_tiles/', methods=['POST'])
+@app.route('/app/get_times_by_tiles/', methods=['POST'])
 @flask_cors.cross_origin()
 def get_times_by_tiles():
     json = request.get_json()
-
-    db = firestore.Client()
-    tile_images_ref = db.collection(u's2-tile-cache')
 
     tilesMin = json['tilesMin']
     tilesMax = json['tilesMax']
@@ -1432,19 +1437,9 @@ def get_times_by_tiles():
     txty_min = _compound_tile_index(tilesMin['tx'], tilesMin['ty'])
     txty_max = _compound_tile_index(tilesMax['tx'], tilesMax['ty'])
 
-    tile_images_query = tile_images_ref.where(u'txty', u'>=', txty_min).where(u'txty', u'<=', txty_max) \
-        .select(['image_time', 'image_id'])
+    db = next(get_db())
 
-    for tile_image in tile_images_query.stream():
-        tile_image = tile_image.to_dict()
-        tile_images[tile_image['image_time']] = {
-            'id': tile_image['image_id'],
-            'time': tile_image['image_time']
-        }
-
-        # times.add(tile_image['image_time'])
-
-    # times = list(times)
+    tile_images = crud.query_collection(db, txty_min, txty_max)
 
     times = list(tile_images.keys())
 
@@ -1459,14 +1454,14 @@ def get_times_by_tiles():
     return jsonify(date_list)
 
 
-@app.route('/update_cloudfree_tile_images/', methods=['GET'])
+@app.route('/app/update_cloudfree_tile_images/', methods=['GET'])
 @flask_cors.cross_origin()
 def update_cloudfree_tile_images():
     aoi = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-aoi').geometry()
     tiles = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-tiles-z10')  # .limit(2)
 
     date_end = datetime.today()
-    date_begin = date_end - timedelta(days=365)
+    date_begin = date_end - timedelta(days=800)
 
     def get_tile_images(tile):
         region = tile.geometry().intersection(aoi, 500)
@@ -1486,32 +1481,24 @@ def update_cloudfree_tile_images():
 
     tile_images = [f['properties'] for f in tile_images['features']]
 
-    db = firestore.Client()
-    tile_images_ref = db.collection(u's2-tile-cache')
+    db = next(get_db())
 
-    # delete previous tile_image records
-    for tile in tile_images_ref.stream():
-        tile.reference.delete()
+    crud.delete_collection(db)
 
-    # add new tile_image records
-    for tile_image in tile_images:
-        t = tile_images_ref.document()
-        tile_image['txty'] = _compound_tile_index(tile_image['tx'], tile_image['ty'])
-        t.set(tile_image)
+    crud.add_collection(db, tile_images)
 
     return 'DONE'
 
 
-@app.route('/get_cloudfree_tile_image_count/', methods=['GET'])
+@app.route('/app/get_cloudfree_tile_image_count/', methods=['GET'])
 @flask_cors.cross_origin()
 def get_cloudfree_tile_image_count():
-    db = firestore.Client()
-    tile_images = db.collection(u's2-tile-cache').list_documents()
+    db = next(get_db())
 
-    return str(len(list(tile_images)))
+    return str(crud.count_tiles(db))
 
 
-@app.route('/')
+@app.route('/app/')
 @flask_cors.cross_origin()
 def root():
     """

@@ -1,10 +1,11 @@
 import sys, os
 import base64
 
+from app.postgres import Base, engine
+
 sys.path.append(os.getcwd())
 
 import ee
-
 
 def initialize_google_earth_engine():
     EE_ACCOUNT = 'vegetatie-monitor@appspot.gserviceaccount.com'
@@ -28,9 +29,7 @@ def initialize_google_earth_engine():
     if 'key' in os.environ:
         os.unlink(EE_PRIVATE_KEY_FILE)
  
-
 initialize_google_earth_engine()
-
 
 FIREBASE_PRIVATE_KEY_FILE = 'privatekey-firestore.json'
 
@@ -42,13 +41,12 @@ if 'key_firebase' in os.environ:
     with open(FIREBASE_PRIVATE_KEY_FILE, 'w') as f:
         f.write(content)
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = FIREBASE_PRIVATE_KEY_FILE
-
-
 # from . import api  # initialize EE first
 from api import app
+
+Base.metadata.create_all(bind=engine)
 
 if __name__ == '__main__':
     # This is used when running locally. Gunicorn is used to run the
     # application on Google App Engine. See entrypoint in app.yaml.
-    app.run(host='127.0.0.1', port=8081, debug=True, ssl_context='adhoc')
+    app.run(host="0.0.0.0", debug=True, port=80, threaded=True)
