@@ -171,13 +171,16 @@ def visualize_image(image, vis):
     if not vis:
         vis = {}
 
-    min = 0.065
-    max = [0.2, 0.2, 0.3]
-    gamma = 1.2
+    # min = 0.065
+    # max = [0.3, 0.3, 0.4]
+    # gamma = 1.2
+    # vis = add_vis_parameter(vis, 'min', min)
+    # vis = add_vis_parameter(vis, 'max', max)
+    # vis = add_vis_parameter(vis, 'gamma', gamma)
 
-    vis = add_vis_parameter(vis, 'min', min)
-    vis = add_vis_parameter(vis, 'max', max)
-    vis = add_vis_parameter(vis, 'gamma', gamma)
+    vis['min'] = 0.05
+    vis['max'] = [0.3, 0.3, 0.4]
+    vis['gamma'] = 1.2
 
     return image.visualize(**vis)
 
@@ -233,7 +236,7 @@ def _get_landuse(region, date_begin, date_end):
     :return:
     """
     class_property = 'Legger'
-    image_path = 'projects/deltares-rws/vegetatiemonitor/fotointerpretatie-rijn-maas-merged-2017-image-10m'
+    image_path = 'projects/deltares-rws/vegetatiemonitor/annual-maps-input/fotointerpretatie-rijn-maas-merged-2017-image-10m'
     landuse_legger = ee.Image(image_path).rename(class_property)
 
     # get an image given region and dates
@@ -369,10 +372,10 @@ def get_landuse_vs_legger(region, date_begin, date_end, vis):
 
 def _get_legger_image(date_begin):
     if datetime.strptime(date_begin, '%Y-%m-%d') < datetime(2020, 5, 24):
-        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/legger-2012-6-class-10m')\
+        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/annual-maps-input/legger-2012-6-class-10m')\
             .rename('type')
     else:
-        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/legger-2020-6-class-10m')\
+        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/annual-maps-input/legger-2020-6-class-10m')\
             .rename('type')
 
     return legger
