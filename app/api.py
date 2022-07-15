@@ -1462,8 +1462,8 @@ def get_times_by_tiles():
 @app.route('/update_cloudfree_tile_images/', methods=['GET'])
 @flask_cors.cross_origin()
 def update_cloudfree_tile_images():
-    aoi = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-aoi').geometry()
-    tiles = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-tiles-z10')  # .limit(2)
+    aoi = ee.FeatureCollection('projects/deltares-rws/vegetatiemonitor/vegetation-monitor-aoi').geometry()
+    tiles = ee.FeatureCollection('projects/deltares-rws/vegetatiemonitor/vegetation-monitor-tiles-z10')  # .limit(2)
 
     date_end = datetime.today()
     date_begin = date_end - timedelta(days=365)
