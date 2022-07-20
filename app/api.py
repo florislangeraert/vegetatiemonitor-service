@@ -273,8 +273,11 @@ def _get_landuse(region, date_begin, date_end):
     # classify current image
     classified = image.classify(classifier)
 
+    legger = _get_legger_image(date_begin)
+    legger_mask = legger.mask()
+
     classified = classified \
-        .updateMask(landuse_legger.mask()) \
+        .updateMask(legger_mask) \
         .clip(region)
 
     return classified \
@@ -1223,7 +1226,7 @@ def predict_roughness(region, start_date, num_years):
     # start_date = ee.Date(startYearString + '-11-01')
     feature = ee.FeatureCollection(region["features"]).first()
     ecotop_features = ee.FeatureCollection("users/gertjang/succession/ecotopen_cyclus_drie_rijntakken_utm31n")
-    classified_images = ee.ImageCollection('users/rogersckw9/vegetatiemonitor/yearly-classified-images')
+    classified_images = ee.ImageCollection(yearly_collections['landuse'])
     start_year = ee.Date(start_date).get('year')
     lookback = start_date.advance(-1, 'year')
 
@@ -1309,7 +1312,7 @@ def get_roughness_info(prediction_images):
     prediction_images = prediction_images.filterDate(predict_start, predict_start.advance(10, 'years'))
 
     # ecotop_features = ee.FeatureCollection("users/gertjang/succession/ecotopen_cyclus_drie_rijntakken_utm31n")
-    image_collection = ee.ImageCollection('users/rogersckw9/vegetatiemonitor/yearly-classified-images')
+    image_collection = ee.ImageCollection(yearly_collections['landuse'])
     empty = ee.Image().set("system:time_start", ee.Date("2012-06-01").millis()).rename("ruwheid")
     image_collection = image_collection.merge(ee.ImageCollection([empty])).sort("system:time_start")
     # ecotopen_images = ecotopen_images.map(add_date)
@@ -1468,8 +1471,8 @@ def get_times_by_tiles():
 @app.route('/update_cloudfree_tile_images/', methods=['GET'])
 @flask_cors.cross_origin()
 def update_cloudfree_tile_images():
-    aoi = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-aoi').geometry()
-    tiles = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-tiles-z10')  # .limit(2)
+    aoi = ee.FeatureCollection('projects/deltares-rws/vegetatiemonitor/vegetation-monitor-aoi').geometry()
+    tiles = ee.FeatureCollection('projects/deltares-rws/vegetatiemonitor/vegetation-monitor-tiles-z10')  # .limit(2)
 
     date_end = datetime.today()
     date_begin = date_end - timedelta(days=365)
