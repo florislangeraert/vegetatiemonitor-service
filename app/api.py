@@ -68,7 +68,7 @@ def to_date_time_string(millis):
 
 
 def get_satellite_images(region, date_begin, date_end, cloud_filtering):
-    images = ee.ImageCollection('COPERNICUS/S2') \
+    images = ee.ImageCollection('COPERNICUS/S2_HARMONIZED') \
         .select(band_names['s2'], band_names['readable']) \
         .filterBounds(region)
 
