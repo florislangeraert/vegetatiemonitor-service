@@ -1,2 +1,2 @@
 cd app
-gcloud app deploy --project vegetatie-monitor --version=dev1
+gcloud app deploy --project vegetatie-monitor --version=v8-test

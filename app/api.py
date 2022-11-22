@@ -76,7 +76,7 @@ def to_date_time_string(millis):
 
 
 def get_satellite_images(region, date_begin, date_end, cloud_filtering):
-    images = ee.ImageCollection('COPERNICUS/S2') \
+    images = ee.ImageCollection('COPERNICUS/S2_HARMONIZED') \
         .select(band_names['s2'], band_names['readable']) \
         .filterBounds(region)
 
@@ -87,7 +87,7 @@ def get_satellite_images(region, date_begin, date_end, cloud_filtering):
         images = images.filterDate(date_begin, date_end)
 
     filter_options = {
-        'score_percentile': 95
+        'score_percentile': 75
     }
 
     if cloud_filtering:
@@ -179,20 +179,26 @@ def visualize_image(image, vis):
     if not vis:
         vis = {}
 
-    min = 0.05
-    max = [0.35, 0.35, 0.45]
-    gamma = 1.4
+    # min = 0.065
+    # max = [0.3, 0.3, 0.4]
+    # gamma = 1.2
+    # vis = add_vis_parameter(vis, 'min', min)
+    # vis = add_vis_parameter(vis, 'max', max)
+    # vis = add_vis_parameter(vis, 'gamma', gamma)
 
-    vis = add_vis_parameter(vis, 'min', min)
-    vis = add_vis_parameter(vis, 'max', max)
-    vis = add_vis_parameter(vis, 'gamma', gamma)
+    vis['min'] = 0.05
+    vis['max'] = [0.3, 0.3, 0.4]
+    vis['gamma'] = 1.2
 
     return image.visualize(**vis)
 
 
 def get_satellite_image(region, date_begin, date_end, vis):
+    def resample_bicubic(i):
+        return i.resample('bicubic')
+
     images = get_satellite_images(region, date_begin, date_end, False)
-    image = ee.Image(images.mosaic()).divide(10000)
+    image = ee.Image(images.map(resample_bicubic).mosaic()).divide(10000)
     image = visualize_image(image, vis)
 
     return image
@@ -238,7 +244,7 @@ def _get_landuse(region, date_begin, date_end):
     :return:
     """
     class_property = 'Legger'
-    image_path = 'projects/deltares-rws/vegetatiemonitor/fotointerpretatie-rijn-maas-merged-2017-image-10m'
+    image_path = 'projects/deltares-rws/vegetatiemonitor/annual-maps-input/fotointerpretatie-rijn-maas-merged-2017-image-10m'
     landuse_legger = ee.Image(image_path).rename(class_property)
 
     # get an image given region and dates
@@ -377,10 +383,10 @@ def get_landuse_vs_legger(region, date_begin, date_end, vis):
 
 def _get_legger_image(date_begin):
     if datetime.strptime(date_begin, '%Y-%m-%d') < datetime(2020, 5, 24):
-        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/legger-2012-6-class-10m')\
+        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/annual-maps-input/legger-2012-6-class-10m')\
             .rename('type')
     else:
-        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/legger-2020-6-class-10m')\
+        legger = ee.Image('projects/deltares-rws/vegetatiemonitor/annual-maps-input/legger-2020-6-class-10m')\
             .rename('type')
 
     return legger
@@ -530,12 +536,11 @@ zonal_info = {
 }
 
 yearly_collections = {
-    'satellite': 'users/rogersckw9/vegetatiemonitor/satellite-yearly',
-    'ndvi': 'users/rogersckw9/vegetatiemonitor/satellite-yearly',
+    'satellite': 'projects/deltares-rws/vegetatiemonitor/satellite',
+    'ndvi': 'projects/deltares-rws/vegetatiemonitor/satellite',
     'landuse': 'projects/deltares-rws/vegetatiemonitor/classificatie',
     'landuse-vs-legger': 'projects/deltares-rws/vegetatiemonitor/classificatie-vs-legger'
 }
-
 
 def _get_zonal_timeseries(features, images, scale):
     images = ee.ImageCollection(images)
@@ -725,7 +730,7 @@ def export_map(id):
         asset_type = 'day'
 
     if asset_type not in asset_types:
-        return 'Error: assetType {0} is not supported, only day or year available' \
+        return 'Error: assetType is not supported, only day or year available' \
             .format(asset_type)
 
     date_begin = j['dateBegin']
@@ -799,7 +804,7 @@ def get_map_zonal_info(id):
     """
 
     if id not in ['landuse', 'ndvi', 'landuse-vs-legger', 'legger']:
-        return 'Error: zonal statistics for {0} is not supported yet' \
+        return 'Error: zonal statistics for specific id is not supported yet' \
             .format(id)
 
     json = request.get_json()
@@ -810,14 +815,14 @@ def get_map_zonal_info(id):
         asset_type = 'day'
 
     if asset_type not in asset_types:
-        raise ValueError('Error: assetType {0} is not supported, only day or year available'
+        raise ValueError('Error: assetType is not supported, only day or year available'
                          .format(asset_type))
 
     region = json['region']
 
     date_begin = json.get('dateBegin', None)
     if asset_type == 'day' and not date_begin:
-        raise ValueError('Error: assetType {0} requires dateBegin to be defined.'
+        raise ValueError('Error: assetType requires dateBegin to be defined.'
                          .format(asset_type))
 
     date_end = json.get('dateEnd', None)
@@ -841,7 +846,7 @@ def get_map_zonal_timeseries(id):
     """
 
     if id != 'landuse':
-        return 'Error: zonal timeseries for {0} is not supported yet' \
+        return 'Error: zonal timeseries for id is not supported yet' \
             .format(id)
 
     json = request.get_json()
@@ -905,6 +910,10 @@ def _get_map_times_daily(id, region):
 def _get_map_times_yearly(id, region):
     date_begin = datetime(2000, 1, 1, 0, 0, 0)
     date_end = datetime.now()
+
+    # HACK: switch to landuse maps if we query times for satellite (not exported anymore)
+    if id == 'satellite':
+        id = 'landuse'
 
     images = get_image_collection(yearly_collections[id], region, date_begin, date_end)
 
@@ -1457,8 +1466,8 @@ def get_times_by_tiles():
 @app.route('/app/update_cloudfree_tile_images/', methods=['GET'])
 @flask_cors.cross_origin()
 def update_cloudfree_tile_images():
-    aoi = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-aoi').geometry()
-    tiles = ee.FeatureCollection('users/gdonchyts/vegetation-monitor-tiles-z10')  # .limit(2)
+    aoi = ee.FeatureCollection('projects/deltares-rws/vegetatiemonitor/vegetation-monitor-aoi').geometry()
+    tiles = ee.FeatureCollection('projects/deltares-rws/vegetatiemonitor/vegetation-monitor-tiles-z10')  # .limit(2)
 
     date_end = datetime.today()
     date_begin = date_end - timedelta(days=800)

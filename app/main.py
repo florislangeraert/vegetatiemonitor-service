@@ -49,4 +49,4 @@ Base.metadata.create_all(bind=engine)
 if __name__ == '__main__':
     # This is used when running locally. Gunicorn is used to run the
     # application on Google App Engine. See entrypoint in app.yaml.
-    app.run(host="0.0.0.0", debug=True, port=80, threaded=True)
+    app.run(host="0.0.0.0", debug=False, port=80, threaded=True)
